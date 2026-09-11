@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Class Schedule Generator — Holidays & CSV</title>
+<style>
+:root{
+  --brand:#ffea00; --ink:#222; --muted:#6b7280; --card:#fff; --accent:#d1fae5;
+  --gridgap:12px; --radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:#f5f7fb;color:var(--ink)}
+.shell{max-width:1100px;margin:0 auto}
+.panel{background:var(--card);border-radius:14px;padding:14px;border:1px solid #eef2ff;box-shadow:0 6px 18px rgba(0,0,0,.05)}
+.row{display:grid;grid-template-columns:repeat(12,1fr);gap:10px;margin-bottom:12px}
+.col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-6{grid-column:span 6}.col-12{grid-column:span 12}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+input,select{width:100%;padding:9px;border-radius:10px;border:1px solid #e5e7eb;font-size:14px;background:#fff}
+input:focus{outline:none;box-shadow:0 0 0 3px rgba(59,130,246,.12);border-color:#93c5fd}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.day-box{border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:white}
+.day-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;background:#fffa9e;border-radius:8px;padding:4px 6px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions{display:flex;gap:10px;justify-content:flex-end;padding:8px 0;flex-wrap:wrap}
+button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+.primary{background:#111827;color:#fff}.ghost{background:transparent;border:1px solid #d1d5db;color:#111827}.success{background:#16a34a;color:#fff}
+.cover{display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px;gap:12px;flex-wrap:wrap}
+.title{font-weight:800;font-size:22px}
+.badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{background:var(--accent);padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid #a7f3d0}
+.total{font-weight:700;font-size:14px;background:#fef3c7;border:1px dashed #f59e0b;padding:8px 12px;border-radius:12px}
+.calendar{background:#eaf0e6;border-radius:18px;padding:14px;border:1px solid #d9ead3}
+.hdr{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gridgap);margin-bottom:var(--gridgap)}
+.hdr div{background:var(--brand);text-align:center;padding:8px 6px;border-radius:10px;font-weight:800;text-transform:capitalize;border:1px solid #facc15}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gridgap)}
+.card {
+  background: white;
+  border-radius: 10px;
+  border: 2px solid #cfe7c6;
+  min-height: 120px;
+  position: relative;
+  padding: 20px;
+  box-shadow: 0 3px 0 #bfe1b4 inset;
+}
+.holiday {
+  padding: 14px;
+}
+.small{position:absolute;top:8px;left:8px;font-size:12px;color:#374151;font-weight:700}
+.big{display:flex;align-items:center;justify-content:space-between;margin-top:16px;font-size:26px;font-weight:800}
+.month{font-size:12px;font-weight:700;text-transform:uppercase;color:#374151}
+.dur{position:absolute;top:-10px;right:10px;background:white;border:1px solid #e5e7eb;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.notes{margin-top:14px;background:#fff;border-radius:12px;padding:12px;border:1px solid #e5e7eb;min-height:80px}
+.muted{color:var(--muted)}
+.holiday .small {
+  top: 6px;
+  left: 6px;
+  font-size: 13px;
+  line-height: 1.2em;
+  white-space: normal;
+}
+.holiday{background:#fff1f2 !important;border-color:#fecaca !important;box-shadow:0 3px 0 #fca5a5 inset !important;color:#991b1b}
+.holiday .month,.holiday .small{color:#991b1b !important}
+
+/* ── Placement day card (blue) ── */
+.placement {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  box-shadow: 0 3px 0 #60a5fa inset !important;
+}
+.placement .small { color: #1e40af !important; }
+.placement .month { color: #1e40af !important; }
+.placement .big   { color: #1e40af !important; }
+.placement .dur   { border-color: #93c5fd; color: #1e40af; }
+
+/* ── Toast notification ── */
+#toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #111827;
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.25);
+  pointer-events: none;
+  transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s ease;
+  opacity: 0;
+  z-index: 9999;
+}
+#toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+#toast.green { background: #16a34a; }
+#toast.red   { background: #dc2626; }
+#toast.blue  { background: #2563eb; }
+
+/* ── Holiday list below add button ── */
+#holidayList { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+.h-chip {
+  background:#fee2e2; border:1px solid #fca5a5; border-radius:999px;
+  font-size:12px; padding:4px 10px; color:#991b1b; display:flex; align-items:center; gap:6px;
+}
+.h-chip button {
+  background:none; border:none; color:#991b1b; font-size:14px;
+  cursor:pointer; padding:0; line-height:1; font-weight:900;
+}
+
+@media (max-width:1100px){.hdr,.grid{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:760px){.hdr,.grid{grid-template-columns:repeat(2,1fr)}.title{font-size:18px}}
+@media print{
+  body{background:white;padding:0}
+  .panel,.actions{display:none}
+  .calendar{border:none;box-shadow:none}
+  .card{break-inside:avoid}
+  .day-head{background:#ffea00 !important;color:#000 !important}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="panel" id="controls">
+    <div class="row">
+      <div class="col-4"><label>Subject</label><input id="subject"></div>
+      <div class="col-4"><label>Teacher</label><input id="teacher"></div>
+      <div class="col-4"><label>Classroom</label><input id="classroom"></div>
+      <div class="col-3"><label>Start date</label><input id="start" type="date"></div>
+      <div class="col-3"><label>Total hours to teach</label><input id="totalHours" type="number" step="0.5"></div>
+      <div class="col-6"><label class="note">Tip: set different time + duration per selected day.</label></div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <div class="days">
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Mon"> Mon</strong></div><div class="pair"><input placeholder="Start–End" data-time="Mon"><input type="number" step="0.5" placeholder="Hours" data-hours="Mon"></div></div>
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Tue"> Tue</strong></div><div class="pair"><input placeholder="Start–End" data-time="Tue"><input type="number" step="0.5" placeholder="Hours" data-hours="Tue"></div></div>
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Wed"> Wed</strong></div><div class="pair"><input placeholder="Start–End" data-time="Wed"><input type="number" step="0.5" placeholder="Hours" data-hours="Wed"></div></div>
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Thu"> Thu</strong></div><div class="pair"><input placeholder="Start–End" data-time="Thu"><input type="number" step="0.5" placeholder="Hours" data-hours="Thu"></div></div>
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Fri"> Fri</strong></div><div class="pair"><input placeholder="Start–End" data-time="Fri"><input type="number" step="0.5" placeholder="Hours" data-hours="Fri"></div></div>
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Sat"> Sat</strong></div><div class="pair"><input placeholder="Start–End" data-time="Sat"><input type="number" step="0.5" placeholder="Hours" data-hours="Sat"></div></div>
+          <div class="day-box"><div class="day-head"><strong><input type="checkbox" class="chk" data-day="Sun"> Sun</strong></div><div class="pair"><input placeholder="Start–End" data-time="Sun"><input type="number" step="0.5" placeholder="Hours" data-hours="Sun"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <label>Add custom holiday:</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <input type="date" id="customHolidayDate" style="width:auto;flex:0 0 160px">
+          <input type="text" id="customHolidayReason" placeholder="Reason" style="flex:1;min-width:160px">
+          <button onclick="addHoliday()" class="primary" style="white-space:nowrap">Add Holiday</button>
+          <button onclick="clearCustomHolidays()" class="ghost" style="white-space:nowrap">Clear Custom</button>
+        </div>
+        <div id="holidayList"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="ghost" id="clear">Clear Output</button>
+      <button class="success" id="printBtn">Print / Save PDF</button>
+      <button class="primary" id="go">Generate Schedule</button>
+      <button class="ghost" id="exportCSV">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="cover">
+    <div class="title" id="outTitle">Schedule</div>
+    <div class="badges" id="outBadges"></div>
+    <div class="total" id="outTotal">Total hours: 0</div>
+  </div>
+
+  <div class="calendar">
+    <div class="hdr" id="hdrRow"></div>
+    <div class="grid" id="grid"></div>
+    <div class="notes">
+      <strong>Notes:</strong>
+      <div class="muted" id="notesText"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+const WEEKDAY = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function toISO(d){ const z=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`; }
+function fmtMonth(d){ return d.toLocaleString(undefined,{month:"short"}); }
+function hoursLabel(h){ const whole=Math.floor(h); const mins=Math.round((h-whole)*60); return mins===0?`${whole}h`:`${whole>0?whole+'h ':''}${mins}m`; }
+
+/* ── Toast ── */
+let toastTimer = null;
+function showToast(msg, type='green'){
+  const el = document.getElementById('toast');
+  el.className = `show ${type}`;
+  el.textContent = msg;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.className=''; }, 2800);
+}
+
+/* ── Holidays ── */
+const DEFAULT_HOLIDAYS = {
+  "2026-01-01": "New Year",
+  "2026-01-02": "Public Holiday",
+  "2026-01-04": "Holiday",
+  "2026-01-05": "Holiday",
+  "2026-01-06": "Holiday",
+  "2026-01-07": "Holiday",
+  "2026-01-08": "Holiday",
+  "2026-01-09": "Holiday",
+  "2026-01-10": "Holiday",
+  "2026-03-07": "International Women's Day",
+  "2026-03-08": "International Women's Day",
+  "2026-03-09": "Day in Lieu of International Women's Day",
+  "2026-04-11": "Lao New Year",
+  "2026-04-12": "Lao New Year",
+  "2026-04-13": "Lao New Year",
+  "2026-04-14": "Lao New Year",
+  "2026-04-15": "Lao New Year",
+  "2026-04-16": "Lao New Year",
+  "2026-04-17": "Lao New Year",
+  "2026-04-18": "Lao New Year",
+  "2026-04-19": "Lao New Year",
+  "2026-05-01": "Labor Day",
+  "2026-06-01": "Children's Day",
+  "2026-07-20": "Lao Women's Union Day",
+  "2026-10-07": "Teacher's Day",
+  "2026-10-27": "Boat Racing Festival",
+  "2026-11-24": "Thatluang Festival",
+  "2026-12-02": "Lao National Day",
+  "2026-12-18": "Final Meeting",
+};
+
+// Live map – starts as a copy of defaults; custom additions go here too
+let HOLIDAYS_MAP = { ...DEFAULT_HOLIDAYS };
+// Track which keys were added by the user (to support "Clear Custom")
+let customHolidayKeys = new Set();
+
+function renderHolidayChips(){
+  const list = document.getElementById('holidayList');
+  list.innerHTML = '';
+  [...customHolidayKeys].sort().forEach(iso => {
+    const chip = document.createElement('div');
+    chip.className = 'h-chip';
+    chip.innerHTML = `${iso} — ${HOLIDAYS_MAP[iso]} <button title="Remove" onclick="removeHoliday('${iso}')">×</button>`;
+    list.appendChild(chip);
+  });
+}
+
+function addHoliday() {
+  const date   = document.getElementById('customHolidayDate').value;
+  const reason = document.getElementById('customHolidayReason').value.trim() || "Holiday";
+  if (!date) { showToast('⚠ Please pick a date', 'red'); return; }
+
+  HOLIDAYS_MAP[date] = reason;
+  customHolidayKeys.add(date);
+
+  document.getElementById('customHolidayDate').value  = '';
+  document.getElementById('customHolidayReason').value = '';
+
+  renderHolidayChips();
+  showToast(`✓ Holiday Added: ${date}`, 'green');
+}
+
+function removeHoliday(iso){
+  delete HOLIDAYS_MAP[iso];
+  customHolidayKeys.delete(iso);
+  renderHolidayChips();
+  showToast(`✓ Holiday Removed: ${iso}`, 'blue');
+}
+
+function clearCustomHolidays(){
+  if(customHolidayKeys.size === 0){ showToast('No custom holidays to clear', 'blue'); return; }
+  customHolidayKeys.forEach(k => delete HOLIDAYS_MAP[k]);
+  customHolidayKeys.clear();
+  renderHolidayChips();
+  showToast('✓ Custom Holidays Cleared', 'red');
+}
+
+/* ── Save/Load inputs ── */
+function saveInputs(){
+  const vals = {subject:subject.value,teacher:teacher.value,classroom:classroom.value,start:start.value,totalHours:totalHours.value};
+  localStorage.setItem('scheduleInputs',JSON.stringify(vals));
+}
+function loadInputs(){
+  const data=JSON.parse(localStorage.getItem('scheduleInputs')||"{}");
+  if(data.subject) subject.value=data.subject;
+  if(data.teacher) teacher.value=data.teacher;
+  if(data.classroom) classroom.value=data.classroom;
+  if(data.start) start.value=data.start;
+  if(data.totalHours) totalHours.value=data.totalHours;
+}
+loadInputs();
+
+/* ── Build Params ── */
+function buildParams(){
+  saveInputs();
+  const subject    = document.getElementById('subject').value.trim()||'Class';
+  const teacher    = document.getElementById('teacher').value.trim()||'—';
+  const classroom  = document.getElementById('classroom').value.trim()||'—';
+  const startVal   = document.getElementById('start').value;
+  const start      = startVal ? new Date(startVal+"T00:00:00") : new Date();
+  const totalHours = parseFloat(document.getElementById('totalHours').value||0);
+  const chosen={};
+  document.querySelectorAll('.chk').forEach(chk=>{
+    if(!chk.checked) return;
+    const day  = chk.dataset.day;
+    const hrs  = parseFloat(document.querySelector(`[data-hours="${day}"]`).value||0);
+    const time = document.querySelector(`[data-time="${day}"]`).value.trim();
+    if(hrs>0 && time) chosen[day]={hours:hrs,time};
+  });
+  return {subject,teacher,classroom,start,totalHours,chosen};
+}
+
+/* ── Auto SST Break every 54 hours ── */
+function insertSSTBreak(events, cursor) {
+
+  // find next Saturday
+  let breakSat = new Date(cursor);
+  while (breakSat.getDay() !== 6) {
+    breakSat.setDate(breakSat.getDate() + 1);
+  }
+
+  // Saturday break
+  events.push({
+    date: new Date(breakSat),
+    weekday: "Sat",
+    holiday: true,
+    reason: "SST BREAK",
+    hours: 0,
+    time: ""
+  });
+
+  // Sunday break
+  let breakSun = new Date(breakSat);
+  breakSun.setDate(breakSun.getDate() + 1);
+
+  events.push({
+    date: new Date(breakSun),
+    weekday: "Sun",
+    holiday: true,
+    reason: "SST BREAK",
+    hours: 0,
+    time: ""
+  });
+}
+
+function generate({start,totalHours,chosen}){
+
+  const weekdayToNum={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+  const selectedNums=Object.keys(chosen).map(d=>weekdayToNum[d]);
+
+  const events=[];
+  let hoursDone=0;
+  //let hoursSinceBreak=0;
+  let cursor=new Date(start);
+  cursor.setHours(0,0,0,0);
+
+  const maxDays=365*3;
+  let daysScanned=0;
+
+  while(hoursDone < totalHours && daysScanned < maxDays){
+
+    const iso=toISO(cursor);
+    const dow=cursor.getDay();
+    const dayName=WEEKDAY[dow];
+
+    // Skip days not selected
+    if(selectedNums.includes(dow)){
+      const slot=chosen[dayName];
+
+      if(HOLIDAYS_MAP[iso]){
+        // Holiday: add as holiday event, but do not count hours
+        events.push({
+          date: new Date(cursor),
+          weekday: dayName,
+          holiday:true,
+          reason: HOLIDAYS_MAP[iso],
+          hours:0,
+          time:""
+        });
+      }
+      else if(slot){
+        // Normal working day
+        const useHrs=Math.min(slot.hours,totalHours-hoursDone);
+
+        events.push({
+          date:new Date(cursor),
+          weekday: dayName,
+          holiday:false,
+          hours: useHrs,
+          time: slot.time,
+          partial: useHrs<slot.hours
+        });
+
+        hoursDone += useHrs;
+        //hoursSinceBreak += useHrs;
+       
+      }
+    }
+
+    cursor.setDate(cursor.getDate()+1);
+    daysScanned++;
+  }
+
+  return events;
+}
+
+/* ── Render header ── */
+function renderHeader(events){
+  const hdr=document.getElementById('hdrRow'); hdr.innerHTML='';
+  const cols=6;
+  if(events.length===0){ for(let i=0;i<cols;i++){const d=document.createElement('div');d.textContent='-';hdr.appendChild(d);} return; }
+  let i=0,idx=0;
+  while(i<cols){
+    const ev=events[idx%events.length];
+    const div=document.createElement('div');
+    div.textContent=ev.weekday;
+    hdr.appendChild(div);
+    i++;idx++;
+  }
+}
+
+/* ── Render schedule ── */
+function render(events,params){
+  const grid=document.getElementById('grid'); grid.innerHTML='';
+  document.getElementById('outTitle').textContent=params.subject;
+  const badges=document.getElementById('outBadges'); badges.innerHTML='';
+  const b=t=>{const el=document.createElement('div');el.className='badge';el.textContent=t;return el;};
+  badges.appendChild(b(`Teacher: ${params.teacher}`));
+  badges.appendChild(b(`Classroom: ${params.classroom}`));
+  const timesSummary=Object.entries(params.chosen).map(([d,v])=>`${d} (${v.time})`).join(' · ');
+  if(timesSummary) badges.appendChild(b(timesSummary));
+
+  const regularHours = events.filter(e=>!e.holiday&&!e.placement).reduce((a,e)=>a+e.hours,0);
+  const makeupHours  = events.filter(e=>e.placement).reduce((a,e)=>a+e.hours,0);
+  document.getElementById('outTotal').textContent=
+    `Total hours: ${regularHours.toFixed(1)} + ${makeupHours.toFixed(1)} makeup = ${(regularHours+makeupHours).toFixed(1)}`;
+
+  renderHeader(events);
+
+  events.forEach(ev=>{
+    const card=document.createElement('div'); card.className='card';
+    if(ev.holiday) card.classList.add('holiday');
+    if(ev.placement) card.classList.add('placement');
+
+    if(!ev.holiday){
+      const dur=document.createElement('div'); dur.className='dur';
+      dur.textContent=hoursLabel(ev.hours);
+      if(ev.partial) dur.title='Trimmed to meet total hours';
+      card.appendChild(dur);
+    }
+
+    const small=document.createElement('div'); small.className='small';
+    if(ev.holiday){
+      small.textContent=`Holiday • ${ev.reason}`;
+    } else if(ev.placement){
+      // Show which holiday this makeup replaces
+      const origDate = new Date(ev.placementFor+'T00:00:00');
+      const origLabel = origDate.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+      small.textContent=`📅 Makeup for ${origLabel} • ${ev.time}`;
+    } else {
+      small.textContent=`${ev.weekday} • ${ev.time}`;
+    }
+    card.appendChild(small);
+
+    const big=document.createElement('div'); big.className='big';
+    const dd=document.createElement('div'); dd.textContent=String(ev.date.getDate()).padStart(2,'0');
+    const mm=document.createElement('div'); mm.className='month'; mm.textContent=fmtMonth(ev.date);
+    big.appendChild(dd); big.appendChild(mm); card.appendChild(big);
+    grid.appendChild(card);
+  });
+
+  const notesEl=document.getElementById('notesText');
+  const holidaysInTerm=events.filter(e=>e.holiday);
+  const makeupsInTerm =events.filter(e=>e.placement);
+  const lines=[];
+  lines.push('<strong>Holidays (missed classes):</strong>');
+  holidaysInTerm.forEach(h=>{
+    const makeup=makeupsInTerm.find(m=>m.placementFor===toISO(h.date));
+    const makeupStr=makeup
+      ? ` → Makeup: ${makeup.date.toLocaleDateString(undefined,{day:'2-digit',month:'long',year:'numeric'})} (${makeup.weekday})`
+      : '';
+    lines.push(`• ${h.date.toLocaleDateString(undefined,{day:'2-digit',month:'long',year:'numeric'})} : ${h.reason}${makeupStr}`);
+  });
+  lines.push('');
+  //lines.push('Placement days (blue cards) compensate for holidays. Partial final session trimmed to match exact total hours.');
+  notesEl.innerHTML=lines.join('<br>');
+}
+
+/* ── Export CSV ── */
+function exportCSV(events){
+  if(events.length===0){ alert("Nothing to export"); return; }
+  let csv="Date,Weekday,Time,Hours,Holiday,Placement,Reason\n";
+  events.forEach(e=>{
+    csv+=`${toISO(e.date)},${e.weekday},${e.time||""},${e.hours},${!!e.holiday},${!!e.placement},${e.reason||e.placementFor||""}\n`;
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`${document.getElementById('subject').value||'schedule'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ── Button events ── */
+document.getElementById('go').addEventListener('click',()=>{
+  const params=buildParams();
+  const events=generate(params);
+  render(events,params);
+});
+
+document.getElementById('exportCSV').addEventListener('click',()=>{
+  const params=buildParams();
+  const events=generate(params);
+  exportCSV(events);
+});
+
+document.getElementById('clear').addEventListener('click',()=>{
+  document.getElementById('grid').innerHTML='';
+  document.getElementById('outBadges').innerHTML='';
+  document.getElementById('outTitle').textContent='Schedule';
+  document.getElementById('outTotal').textContent='Total hours: 0';
+  document.getElementById('notesText').innerHTML='';
+});
+
+document.getElementById('printBtn').addEventListener('click',()=>window.print());
+</script>
+</body>
+</html>
